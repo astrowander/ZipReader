@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <memory>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -15,13 +16,12 @@ class MainWindow : public QMainWindow
 
 public:
     MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
 
 private slots:
     void on_pushButton_clicked();
 
 private:
-    Ui::MainWindow *ui;
-    ZipTableModel* model;
+    std::shared_ptr<Ui::MainWindow> ui;
+    std::shared_ptr<ZipTableModel> model;
 };
 #endif // MAINWINDOW_H

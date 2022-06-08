@@ -1,7 +1,9 @@
 #include "ziptablemodel.h"
 
 #include <QMessageBox>
+
 #include <stdexcept>
+#include <memory>
 
 #include <mz.h>
 #include <mz_strm.h>
@@ -22,7 +24,6 @@ ZipTableModel::ZipTableModel(const std::string &pathToZip)
 {
     void* zipReader = nullptr;
     void *file_stream = nullptr;
-    int32_t* err = new int(0);
 
     mz_zip_reader_create(&zipReader);
     mz_stream_os_create(&file_stream);
@@ -36,30 +37,40 @@ ZipTableModel::ZipTableModel(const std::string &pathToZip)
     if (mz_zip_open(zipReader, file_stream, MZ_OPEN_MODE_READ) != MZ_OK)
     {
         ShowErrorMessage("Unable to read the archive");
+        mz_stream_os_delete(&file_stream);
         return;
     }
 
-    *err = mz_zip_goto_first_entry(zipReader);
+    int32_t err = mz_zip_goto_first_entry(zipReader);
 
-    if (*err != MZ_OK)
+    if (err != MZ_OK)
     {
         ShowErrorMessage("The archive is empty");
+
+        mz_zip_reader_close(zipReader);
+        mz_stream_os_delete(&file_stream);
+        mz_zip_reader_delete(&zipReader);
+
         return;
     }
 
-    while (*err == MZ_OK)
+    while (err == MZ_OK)
     {
         mz_zip_entry_read_open(zipReader, 0, "");
-        if  (mz_zip_entry_is_dir(zipReader) != MZ_OK)
+        if  (mz_zip_entry_is_dir(zipReader) == MZ_OK)
         {
-            mz_zip_file* zipFileInfo = nullptr;
-            mz_zip_entry_get_info(zipReader, &zipFileInfo);
-            _data.append({QString(zipFileInfo->filename), zipFileInfo->uncompressed_size});
+            err = mz_zip_goto_next_entry(zipReader);
+            continue;
         }
-        *err = mz_zip_goto_next_entry(zipReader);
+
+        mz_zip_file* zipFileInfo = nullptr;
+        mz_zip_entry_get_info(zipReader, &zipFileInfo);
+        _data.append({QString(zipFileInfo->filename), zipFileInfo->uncompressed_size});
+
+        err = mz_zip_goto_next_entry(zipReader);
      }
 
-     mz_zip_reader_close(zipReader);
+
      mz_stream_os_delete(&file_stream);
      mz_zip_reader_delete(&zipReader);
 }
@@ -80,7 +91,7 @@ QVariant ZipTableModel::data(const QModelIndex &index, int role) const
         throw std::invalid_argument("index.column");
 
     if (index.row() < 0 || index.row() >= _data.size())
-        throw std::invalid_argument("index.column");
+        throw std::invalid_argument("index.row");
 
     switch (role)
     {
@@ -102,5 +113,4 @@ QVariant ZipTableModel::headerData(int section, Qt::Orientation orientation, int
     default:
         return QVariant();
     }
-
 }
