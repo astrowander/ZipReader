@@ -22,51 +22,51 @@ void ShowErrorMessage(const QString& message)
 
 void* CreateZipReader()
 {
-    void* zipReader = nullptr;
-    mz_zip_reader_create(&zipReader);
-    return zipReader;
+    void* pZipReader = nullptr;
+    mz_zip_reader_create(&pZipReader);
+    return pZipReader;
 }
 
 void* CreateFileStream()
 {
-    void* fileStream = nullptr;
-    mz_stream_os_create(&fileStream);
-    return fileStream;
+    void* pFileStream = nullptr;
+    mz_stream_os_create(&pFileStream);
+    return pFileStream;
 }
 
 ZipTableModel::ZipTableModel(const std::string &pathToZip)
 {
-    std::shared_ptr<void> pSmartZipReader(CreateZipReader(), [](void* p){mz_zip_reader_delete(&p); });
-    std::shared_ptr<void> pSmartFileStream(CreateFileStream(), [](void* p){mz_stream_os_delete(&p); });
+    std::shared_ptr<void> pZipReader(CreateZipReader(), [](void* p){mz_zip_reader_delete(&p); });
+    std::shared_ptr<void> pFileStream(CreateFileStream(), [](void* p){mz_stream_os_delete(&p); });
 
-    if (mz_stream_os_open(pSmartFileStream.get(), pathToZip.c_str(), MZ_OPEN_MODE_READ) != MZ_OK)
+    if (mz_stream_os_open(pFileStream.get(), pathToZip.c_str(), MZ_OPEN_MODE_READ) != MZ_OK)
     {
         ShowErrorMessage("Unable to open the file");
         return;
     }
 
-    if (mz_zip_open(pSmartZipReader.get(), pSmartFileStream.get(), MZ_OPEN_MODE_READ) != MZ_OK)
+    if (mz_zip_open(pZipReader.get(), pFileStream.get(), MZ_OPEN_MODE_READ) != MZ_OK)
     {
         ShowErrorMessage("Unable to read the archive");
         return;
     }
 
-    if (mz_zip_goto_first_entry(pSmartZipReader.get()) != MZ_OK)
+    if (mz_zip_goto_first_entry(pZipReader.get()) != MZ_OK)
     {
         ShowErrorMessage("The archive is empty");
-        mz_zip_reader_close(pSmartZipReader.get());
+        mz_zip_reader_close(pZipReader.get());
         return;
     }
 
     do
     {
-        if  (mz_zip_entry_is_dir(pSmartZipReader.get()) == MZ_OK)
+        if  (mz_zip_entry_is_dir(pZipReader.get()) == MZ_OK)
             continue;
 
         mz_zip_file* zipFileInfo = nullptr;
-        mz_zip_entry_get_info(pSmartZipReader.get(), &zipFileInfo);
+        mz_zip_entry_get_info(pZipReader.get(), &zipFileInfo);
         _data.append({QString(zipFileInfo->filename), zipFileInfo->uncompressed_size});
-     } while (mz_zip_goto_next_entry(pSmartZipReader.get()) == MZ_OK);
+     } while (mz_zip_goto_next_entry(pZipReader.get()) == MZ_OK);
 }
 
 int ZipTableModel::rowCount(const QModelIndex &parent) const
