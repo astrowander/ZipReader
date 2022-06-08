@@ -36,8 +36,8 @@ void* CreateFileStream()
 
 ZipTableModel::ZipTableModel(const std::string &pathToZip)
 {
-    std::shared_ptr<void> pZipReader(CreateZipReader(), [](void* p){mz_zip_reader_delete(&p); });
-    std::shared_ptr<void> pFileStream(CreateFileStream(), [](void* p){mz_stream_os_delete(&p); });
+    std::shared_ptr<void> pZipReader(CreateZipReader(), [](void* p){ mz_zip_reader_delete(&p); });
+    std::shared_ptr<void> pFileStream(CreateFileStream(), [](void* p){ mz_stream_os_delete(&p); });
 
     if (mz_stream_os_open(pFileStream.get(), pathToZip.c_str(), MZ_OPEN_MODE_READ) != MZ_OK)
     {
@@ -54,7 +54,6 @@ ZipTableModel::ZipTableModel(const std::string &pathToZip)
     if (mz_zip_goto_first_entry(pZipReader.get()) != MZ_OK)
     {
         ShowErrorMessage("The archive is empty");
-        mz_zip_reader_close(pZipReader.get());
         return;
     }
 
