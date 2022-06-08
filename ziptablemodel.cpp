@@ -20,59 +20,53 @@ void ShowErrorMessage(const QString& message)
     msgBox.exec();
 }
 
-ZipTableModel::ZipTableModel(const std::string &pathToZip)
+void* CreateZipReader()
 {
     void* zipReader = nullptr;
-    void *file_stream = nullptr;
-
     mz_zip_reader_create(&zipReader);
-    mz_stream_os_create(&file_stream);
+    return zipReader;
+}
 
-    if (mz_stream_os_open(file_stream, pathToZip.c_str(), MZ_OPEN_MODE_READ) != MZ_OK)
+void* CreateFileStream()
+{
+    void* fileStream = nullptr;
+    mz_stream_os_create(&fileStream);
+    return fileStream;
+}
+
+ZipTableModel::ZipTableModel(const std::string &pathToZip)
+{
+    std::shared_ptr<void> pSmartZipReader(CreateZipReader(), [](void* p){mz_zip_reader_delete(&p); });
+    std::shared_ptr<void> pSmartFileStream(CreateFileStream(), [](void* p){mz_stream_os_delete(&p); });
+
+    if (mz_stream_os_open(pSmartFileStream.get(), pathToZip.c_str(), MZ_OPEN_MODE_READ) != MZ_OK)
     {
         ShowErrorMessage("Unable to open the file");
         return;
     }
 
-    if (mz_zip_open(zipReader, file_stream, MZ_OPEN_MODE_READ) != MZ_OK)
+    if (mz_zip_open(pSmartZipReader.get(), pSmartFileStream.get(), MZ_OPEN_MODE_READ) != MZ_OK)
     {
         ShowErrorMessage("Unable to read the archive");
-        mz_stream_os_delete(&file_stream);
         return;
     }
 
-    int32_t err = mz_zip_goto_first_entry(zipReader);
-
-    if (err != MZ_OK)
+    if (mz_zip_goto_first_entry(pSmartZipReader.get()) != MZ_OK)
     {
         ShowErrorMessage("The archive is empty");
-
-        mz_zip_reader_close(zipReader);
-        mz_stream_os_delete(&file_stream);
-        mz_zip_reader_delete(&zipReader);
-
+        mz_zip_reader_close(pSmartZipReader.get());
         return;
     }
 
-    while (err == MZ_OK)
+    do
     {
-        mz_zip_entry_read_open(zipReader, 0, "");
-        if  (mz_zip_entry_is_dir(zipReader) == MZ_OK)
-        {
-            err = mz_zip_goto_next_entry(zipReader);
+        if  (mz_zip_entry_is_dir(pSmartZipReader.get()) == MZ_OK)
             continue;
-        }
 
         mz_zip_file* zipFileInfo = nullptr;
-        mz_zip_entry_get_info(zipReader, &zipFileInfo);
+        mz_zip_entry_get_info(pSmartZipReader.get(), &zipFileInfo);
         _data.append({QString(zipFileInfo->filename), zipFileInfo->uncompressed_size});
-
-        err = mz_zip_goto_next_entry(zipReader);
-     }
-
-
-     mz_stream_os_delete(&file_stream);
-     mz_zip_reader_delete(&zipReader);
+     } while (mz_zip_goto_next_entry(pSmartZipReader.get()) == MZ_OK);
 }
 
 int ZipTableModel::rowCount(const QModelIndex &parent) const
